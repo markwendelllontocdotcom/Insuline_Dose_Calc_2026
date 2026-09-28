@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Insulin Dose">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>Insulin Dose Calculator</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app" id="app">
+
+  <button type="button" class="update-bar" id="update-bar" hidden>A new version is ready – tap here to reload</button>
+  <div class="hud" id="hud" hidden aria-hidden="true">
+    <div class="hud-row">
+      <div class="hud-total">TOTAL <b id="hud-total">0 u</b></div>
+      <div class="hud-reading" id="hud-reading"></div>
+    </div>
+    <div class="message hud-msg" id="hud-msg" data-base="message hud-msg"></div>
+  </div>
+
+  <!-- ===== Calculator (one screen, no scrolling) ===== -->
+  <main class="page page-calc" id="page-calc" data-page="calc">
+
+    <h1 class="title">Insulin Dose Calculator</h1>
+
+    <section class="total" id="total-box" aria-live="polite">
+      <p class="total-label"><strong>TOTAL INSULIN UNITS</strong> to be injected to maintain acceptable Sugar level</p>
+      <output class="total-value" id="total-value"><span id="total-num">0</span><span class="u"> u</span></output>
+    </section>
+
+    <section class="meal" aria-label="Meal Time">
+      <div class="hdr">Meal Time</div>
+      <div class="meal-grid" id="meal-grid" role="radiogroup" aria-label="Meal Time"></div>
+      <p class="meal-info" id="meal-info"></p>
+    </section>
+
+    <section class="boxes">
+      <div class="box box-reading" id="box-reading">
+        <label class="box-h" for="reading">Blood Sugar Reading</label>
+        <label class="box-b reading-body" for="reading">
+          <input class="reading-input" id="reading" type="text" inputmode="numeric" pattern="[0-9]*"
+                 maxlength="3" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done"
+                 aria-label="Blood sugar reading in mg/dL">
+          <span class="unit">mg/dL</span>
+        </label>
+      </div>
+      <div class="box box-arrow" id="box-arrow">
+        <div class="box-h" id="arrow-label">Arrow</div>
+        <div class="box-b arrow-btns" id="arrow-btns" role="group" aria-labelledby="arrow-label"></div>
+      </div>
+      <div class="box box-corr">
+        <div class="box-h">Correction Dose</div>
+        <div class="box-b"><output class="corr-value" id="correction" aria-live="polite"></output></div>
+      </div>
+    </section>
+
+    <div class="message empty" id="message" role="status" aria-live="polite"></div>
+
+    <section class="carbs" aria-label="Carbohydrate Intake">
+      <div class="hdr">Carbohydrate Intake</div>
+      <div class="carb-grid">
+        <div class="ch ch-blank"></div>
+        <div class="ch">Food to Eat</div>
+        <div class="ch">Carbs (g)</div>
+        <div class="ch">Req'd. Dose</div>
+
+        <div class="rl">Food 1</div>
+        <input class="food-name" id="food-name-1" type="text" placeholder="Food name" maxlength="40"
+               autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="next" aria-label="Food 1 name">
+        <input class="food-carbs" id="food-carbs-1" type="text" inputmode="decimal" placeholder="g" maxlength="5"
+               autocomplete="off" aria-label="Food 1 carbs in grams">
+        <output class="food-dose nofood" id="food-dose-1">No food</output>
+
+        <div class="rl">Food 2</div>
+        <input class="food-name" id="food-name-2" type="text" placeholder="Food name" maxlength="40"
+               autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="next" aria-label="Food 2 name">
+        <input class="food-carbs" id="food-carbs-2" type="text" inputmode="decimal" placeholder="g" maxlength="5"
+               autocomplete="off" aria-label="Food 2 carbs in grams">
+        <output class="food-dose nofood" id="food-dose-2">No food</output>
+
+        <div class="rl">Food 3</div>
+        <input class="food-name" id="food-name-3" type="text" placeholder="Food name" maxlength="40"
+               autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="next" aria-label="Food 3 name">
+        <input class="food-carbs" id="food-carbs-3" type="text" inputmode="decimal" placeholder="g" maxlength="5"
+               autocomplete="off" aria-label="Food 3 carbs in grams">
+        <output class="food-dose nofood" id="food-dose-3">No food</output>
+      </div>
+    </section>
+
+    <div class="bottom">
+      <button type="button" class="clear-btn" id="clear">Clear</button>
+      <p class="reminder" id="reminder-line"></p>
+    </div>
+  </main>
+
+  <!-- ===== Plan (read-only, scrolls) ===== -->
+  <section class="page page-scroll" id="page-plan" data-page="plan" hidden>
+    <div class="doc" id="plan-content"></div>
+  </section>
+
+  <!-- ===== Instructions (scrolls) ===== -->
+  <section class="page page-scroll" id="page-help" data-page="help" hidden>
+    <div class="doc" id="help-content"></div>
+  </section>
+
+  <nav class="tabbar" aria-label="Pages">
+    <button type="button" class="tab" data-page="calc" aria-selected="true">Calculator</button>
+    <button type="button" class="tab" data-page="plan" aria-selected="false">Plan</button>
+    <button type="button" class="tab" data-page="help" aria-selected="false">Instructions</button>
+  </nav>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

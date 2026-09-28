@@ -1,0 +1,550 @@
+/* Insulin Dose Calculator – mobile-first, one screen, readable in bright light */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+:root { color-scheme: light; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #fff;
+  color: #000;
+}
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+input { -webkit-user-select: text; user-select: text; }
+button { font: inherit; color: inherit; cursor: pointer; margin: 0; }
+p, h1, h2, h3 { margin: 0; }
+[hidden] { display: none !important; }
+
+/* ---------- Full-height frame with notch / home-bar safe areas ---------- */
+.app {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --avail: calc(100vh - var(--sat) - var(--sab));
+  --u: calc(var(--avail) / 100);             /* 1% of the usable screen height */
+  --side: max(7px, var(--sal));
+  --side-r: max(7px, var(--sar));
+  --gap: clamp(3px, calc(var(--u) * 0.62), 8px);
+  --line: #000;
+  --grey: #D9D9D9;
+  --yellow: #FFFF00;
+
+  position: relative;
+  height: 100vh;
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--sat);
+}
+@supports (height: 100dvh) {
+  .app { height: 100dvh; --avail: calc(100dvh - var(--sat) - var(--sab)); }
+}
+
+.page { flex: 1 1 auto; min-height: 0; }
+
+/* ---------- Calculator page: sections share the height ---------- */
+.page-calc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  padding: calc(var(--gap) * 0.6) var(--side-r) var(--gap) var(--side);
+  overflow-x: hidden;
+  overflow-y: auto; /* safety net only – the layout is sized so this never scrolls */
+}
+.page-calc > * { flex: 0 0 auto; }
+/* Spare height on bigger phones goes into the boxes (bigger buttons), not into empty gaps */
+
+.title {
+  height: clamp(20px, calc(var(--u) * 3.7), 36px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: min(clamp(16px, calc(var(--u) * 3), 26px), 5.8vw);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* TOTAL – the biggest thing on screen */
+.total {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: clamp(54px, calc(var(--u) * 12.3), 114px);
+  flex-grow: 1 !important;
+  padding: 0 10px 0 11px;
+  background: var(--yellow);
+  border: 2.5px solid var(--line);
+  border-radius: 12px;
+}
+.total-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: min(clamp(10.5px, calc(var(--u) * 1.8), 15.5px), 3.3vw);
+  font-weight: 600;
+  line-height: 1.15;
+}
+.total-label strong {
+  display: block;
+  font-size: 1.22em;
+  font-weight: 900;
+  letter-spacing: -0.005em;
+}
+.total-value {
+  flex: 0 0 auto;
+  font-size: min(clamp(36px, calc(var(--u) * 9), 88px), 16vw);
+  font-weight: 900;
+  line-height: 1.12;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.total-value .u { font-size: 0.6em; font-weight: 800; letter-spacing: 0; }
+
+/* Grey header strips (Excel #D9D9D9) */
+.hdr {
+  height: clamp(14px, calc(var(--u) * 2.55), 24px);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  background: var(--grey);
+  border: 1.5px solid var(--line);
+  font-size: min(clamp(10.5px, calc(var(--u) * 1.75), 14px), 3.3vw);
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Meal Time */
+.meal { display: flex; flex-direction: column; flex-grow: 2 !important; }
+.meal .hdr { border-radius: 8px 8px 0 0; border-bottom: 0; }
+.meal-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex: 1 1 auto;
+  grid-auto-rows: minmax(clamp(32px, calc(var(--u) * 6.2), 56px), 1fr);
+  gap: 4px;
+  padding: 4px;
+  border: 1.5px solid var(--line);
+  border-top: 1.5px solid var(--line);
+  border-radius: 0 0 8px 8px;
+}
+.chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 2px 3px;
+  background: #fff;
+  border: 1.5px solid #6b6b6b;
+  border-radius: 8px;
+  font-size: min(clamp(10.5px, calc(var(--u) * 1.8), 15px), 3.25vw);
+  font-weight: 700;
+  line-height: 1.08;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.chip.on {
+  background: var(--yellow);
+  border-color: #000;
+  box-shadow: inset 0 0 0 1.5px #000;
+  font-weight: 900;
+}
+.meal-info {
+  margin-top: 3px;
+  font-size: min(clamp(10px, calc(var(--u) * 1.65), 14px), 3vw);
+  font-style: italic;
+  line-height: 1.15;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Row with 3 boxes */
+.boxes {
+  flex-grow: 1.2 !important;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.05fr) minmax(0, 1fr);
+  gap: 4px;
+}
+.box {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.box-h {
+  height: clamp(24px, calc(var(--u) * 4.3), 38px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  background: var(--grey);
+  border-bottom: 1.5px solid var(--line);
+  font-size: min(clamp(10px, calc(var(--u) * 1.65), 14px), 2.95vw);
+  font-weight: 800;
+  line-height: 1.08;
+  text-align: center;
+}
+.box-b {
+  flex: 1 1 auto;
+  min-height: clamp(42px, calc(var(--u) * 8.5), 78px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg, #fff);
+  color: var(--fg, #000);
+}
+
+/* Blood sugar reading */
+.reading-body { flex-direction: column; cursor: text; padding-bottom: 3px; }
+.reading-input {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: min(clamp(24px, calc(var(--u) * 5.4), 46px), 9vw);
+  font-weight: 900;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  caret-color: currentColor;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.unit {
+  font-size: clamp(9px, calc(var(--u) * 1.4), 12px);
+  font-weight: 700;
+  line-height: 1;
+}
+.box-reading:focus-within { box-shadow: 0 0 0 3px #000; }
+.coloured .reading-input, .coloured .unit, .msg-red, .msg-green {
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+}
+.box-reading.coloured[data-colour="Yellow"] .reading-input,
+.box-reading.coloured[data-colour="Yellow"] .unit { text-shadow: none; }
+
+/* Arrow buttons – only the selected button takes the arrow colour */
+.box-arrow .box-b { background: #fff; }
+.arrow-btns { gap: 3px; padding: 4px; }
+.arrow-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  background: #fff;
+  color: #000;
+  border: 1.5px solid #6b6b6b;
+  border-radius: 7px;
+  font-size: min(clamp(17px, calc(var(--u) * 3.3), 30px), 5.4vw);
+  font-weight: 900;
+  line-height: 1;
+}
+.arrow-btn.dbl { letter-spacing: -0.2em; text-indent: -0.2em; }
+.arrow-btn.on {
+  background: var(--sel-bg);
+  color: var(--sel-fg);
+  border-color: #000;
+  box-shadow: inset 0 0 0 2px #000, 0 0 0 1px #fff;
+}
+
+/* Correction dose */
+.corr-value {
+  font-size: min(clamp(20px, calc(var(--u) * 4.8), 42px), 8.2vw);
+  font-weight: 900;
+  line-height: 1.12;
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.corr-value.small {
+  font-size: min(clamp(12px, calc(var(--u) * 2.1), 18px), 3.7vw);
+  line-height: 1.1;
+  white-space: normal;
+}
+
+/* Message banner */
+.message {
+  min-height: clamp(32px, calc(var(--u) * 6.4), 60px);
+  flex-grow: 0.6 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border: 2px solid transparent;
+  border-radius: 9px;
+  font-size: min(clamp(13px, calc(var(--u) * 2.45), 21px), 3.85vw);
+  font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
+}
+.message.empty { border: 1.5px dashed #c4c4c4; }
+.msg-red { background: #FF0000; color: #fff; border-color: #FF0000; }
+.msg-green { background: #00B050; color: #fff; border-color: #00B050; }
+
+/* Blink: red with white text for 0.5 s, then white with red text for 0.5 s (1 per second) */
+.message.flash { animation: flash 1s steps(1, end) infinite; }
+@keyframes flash {
+  0%  { background: #FF0000; color: #fff; border-color: #FF0000; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3); }
+  50% { background: #fff; color: #FF0000; border-color: #FF0000; text-shadow: none; }
+}
+
+/* Carbohydrate intake */
+.carbs {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 3 !important;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.carbs .hdr { border: 0; border-bottom: 1.5px solid var(--line); }
+.carb-grid {
+  display: grid;
+  grid-template-columns: 14% minmax(0, 1fr) 19.5% 20.5%;
+  flex: 1 1 auto;
+  grid-template-rows: clamp(13px, calc(var(--u) * 2.35), 22px) repeat(3, minmax(clamp(31px, calc(var(--u) * 5.95), 54px), 1fr));
+  gap: 3px 4px;
+  padding: 3px 4px 4px;
+}
+.ch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: min(clamp(10px, calc(var(--u) * 1.6), 13.5px), 2.9vw);
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+.rl {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--grey);
+  border: 1px solid #8a8a8a;
+  border-radius: 6px;
+  font-size: min(clamp(10px, calc(var(--u) * 1.65), 14px), 2.9vw);
+  font-weight: 800;
+  white-space: nowrap;
+}
+.food-name, .food-carbs {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 0 7px;
+  background: #fff;
+  color: #000;
+  border: 1.5px solid #6b6b6b;
+  border-radius: 7px;
+  outline: none;
+  font: inherit;
+  font-size: 16px; /* 16px or more stops iPhone zooming in */
+  font-weight: 600;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.food-carbs { text-align: center; font-weight: 800; padding: 0 2px; }
+.food-name::placeholder, .food-carbs::placeholder { color: #9a9a9a; font-weight: 500; }
+.food-name:focus, .food-carbs:focus { border-color: #000; box-shadow: inset 0 0 0 1.5px #000; }
+.needs { border: 2px dashed #E36C09 !important; box-shadow: none !important; }
+.food-dose {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #c9c9c9;
+  border-radius: 7px;
+  font-size: min(clamp(16px, calc(var(--u) * 3), 26px), 5vw);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.food-dose.nofood {
+  font-size: min(clamp(11px, calc(var(--u) * 1.8), 15px), 3.2vw);
+  font-weight: 600;
+  color: #555;
+}
+
+/* Clear + reminder line */
+.bottom {
+  display: grid;
+  grid-template-columns: 23% minmax(0, 1fr);
+  gap: 7px;
+  min-height: clamp(44px, calc(var(--u) * 7), 58px);
+  flex-grow: 0.4 !important;
+}
+.clear-btn {
+  height: 100%;
+  background: #3a3a3a;
+  color: #fff;
+  border: 2px solid #000;
+  border-radius: 9px;
+  font-size: min(clamp(15px, calc(var(--u) * 2.6), 21px), 4.4vw);
+  font-weight: 800;
+}
+.clear-btn:active { background: #000; }
+.reminder {
+  align-self: center;
+  text-wrap: pretty;
+  font-size: min(clamp(9px, calc(var(--u) * 1.45), 12.5px), 2.55vw);
+  line-height: 1.17;
+  color: #1a1a1a;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+.reminder strong { font-weight: 800; }
+
+/* ---------- Bottom tab bar ---------- */
+.tabbar {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 0 var(--side-r) var(--sab) var(--side);
+  background: #f2f2f2;
+  border-top: 1.5px solid #000;
+}
+.tab {
+  position: relative;
+  height: clamp(28px, calc(var(--u) * 5), 46px);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: #4a4a4a;
+  font-size: min(clamp(12px, calc(var(--u) * 2), 16px), 3.8vw);
+  font-weight: 700;
+}
+.tab[aria-selected="true"] { color: #000; font-weight: 900; }
+.tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  bottom: 3px;
+  left: 26%;
+  right: 26%;
+  height: 3px;
+  background: #000;
+  border-radius: 3px;
+}
+
+/* ---------- Plan & Instructions pages (these may scroll) ---------- */
+.page-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.doc { padding: 14px var(--side-r) 28px var(--side); font-size: 15px; line-height: 1.4; }
+.doc h2 { font-size: 20px; font-weight: 900; margin: 6px 0 10px; }
+.doc h3 { font-size: 15.5px; font-weight: 800; margin: 18px 0 6px; }
+.doc ol, .doc ul { margin: 0 0 8px; padding-left: 22px; }
+.doc li { margin: 0 0 7px; }
+.doc .note { font-size: 13px; color: #333; margin-top: 6px; }
+.doc .disclaimer {
+  margin: 18px 0 8px;
+  padding: 10px 12px;
+  background: var(--yellow);
+  border: 2px solid #000;
+  border-radius: 9px;
+  font-weight: 800;
+}
+.tbl-wrap { overflow-x: auto; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.2; }
+.tbl th, .tbl td { border: 1px solid #000; padding: 6px 4px; text-align: center; }
+.tbl thead th { background: var(--grey); font-weight: 800; font-size: 12.5px; }
+.tbl tbody th { font-weight: 700; text-align: left; }
+.tbl.first-wide tbody th { width: 34%; }
+.swatch {
+  display: inline-block;
+  min-width: 3.4em;
+  padding: 3px 6px;
+  border: 1px solid #000;
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg);
+  font-weight: 900;
+  text-align: center;
+}
+
+/* ---------- Overlays ---------- */
+.update-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  padding: calc(var(--sat) + 10px) 12px 10px;
+  background: #0070C0;
+  color: #fff;
+  border: 0;
+  font-size: 15px;
+  font-weight: 800;
+  text-align: center;
+}
+.hud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 15;
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px var(--side-r) 7px var(--side);
+  background: #fff;
+  border-bottom: 2px solid #000;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+.hud-row { display: flex; gap: 6px; height: 46px; }
+.hud-total {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--yellow);
+  border: 2px solid #000;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 900;
+}
+.hud-total b { font-size: 30px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.hud-reading {
+  flex: 0 0 30%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg, #fff);
+  color: var(--fg, #000);
+  border: 2px solid #000;
+  border-radius: 10px;
+  font-size: 26px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.hud-reading:empty { display: none; }
+.hud-reading::after { content: " mg/dL"; font-size: 11px; font-weight: 700; margin-left: 4px; }
+.hud .message { min-height: 40px; font-size: 15px; }
