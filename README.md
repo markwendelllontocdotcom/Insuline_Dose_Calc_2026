@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/32772801/README.md)
 # Insulin Dose Calculator
 
 A small iPhone web app that follows the *Flexible Insulin Dose Plan 2026* and works out the dose the same way as the Excel calculator.
@@ -54,7 +53,8 @@ The files contain no name or other personal details.
 ## Using it
 
 - The meal time is picked from the phone’s clock (05:00–10:59 Breakfast, 11:00–15:59 Lunch,
-  16:00–20:59 Dinner, otherwise Bedtime). Tap a snack when it is snack time.
+  16:00–20:59 Dinner, otherwise Bedtime). Tap another meal time to change it.
+- The message (for example “Above 180 …”) sits right under the yellow Total.
 - A food row only counts when it has both a name and carbs. An orange dashed box shows which part is missing.
 - While the keypad is open the iPhone may slide the screen up. If that hides the Total, the reading or the
   message, a strip at the top shows all three.
