@@ -46,12 +46,15 @@ const DOSE_PLAN = {
   ],
 
   // Trend arrow adjustment (units) and arrow colours. No arrow (blank) = 0.
+  // "symbol" is the arrow as the FreeStyle Libre app shows it; "planSymbol" is the same arrow as drawn
+  // in the written plan (Libre ↑ = plan ↑↑, Libre ↗ = plan ↑, Libre ↘ = plan ↓, Libre ↓ = plan ↓↓).
+  // "libreTrend" is LibreLinkUp's TrendArrow number for that arrow (used by the Libre Shortcut).
   arrows: [
-    { key: 'upFast',   symbol: '↑↑', name: 'Rising fast',  adjust: 3,  colour: '#C00000', text: '#FFFFFF', colourName: 'Dark Red' },
-    { key: 'up',       symbol: '↑',  name: 'Rising',       adjust: 2,  colour: '#FF0000', text: '#FFFFFF', colourName: 'Red' },
-    { key: 'steady',   symbol: '→',  name: 'Steady',       adjust: 0,  colour: '#FFFF00', text: '#000000', colourName: 'Yellow' },
-    { key: 'down',     symbol: '↓',  name: 'Falling',      adjust: -2, colour: '#92D050', text: '#000000', colourName: 'Light Green' },
-    { key: 'downFast', symbol: '↓↓', name: 'Falling fast', adjust: -3, colour: '#00B050', text: '#FFFFFF', colourName: 'Green' }
+    { key: 'upFast',   symbol: '↑', planSymbol: '↑↑', name: 'Rising quickly',  rate: 'more than 2 mg/dL per minute', libreTrend: 5, adjust: 3,  colour: '#C00000', text: '#FFFFFF', colourName: 'Dark Red' },
+    { key: 'up',       symbol: '↗', planSymbol: '↑',  name: 'Rising',          rate: '1 to 2 mg/dL per minute',      libreTrend: 4, adjust: 2,  colour: '#FF0000', text: '#FFFFFF', colourName: 'Red' },
+    { key: 'steady',   symbol: '→', planSymbol: '→',  name: 'Changing slowly', rate: 'less than 1 mg/dL per minute', libreTrend: 3, adjust: 0,  colour: '#FFFF00', text: '#000000', colourName: 'Yellow' },
+    { key: 'down',     symbol: '↘', planSymbol: '↓',  name: 'Falling',         rate: '1 to 2 mg/dL per minute',      libreTrend: 2, adjust: -2, colour: '#92D050', text: '#000000', colourName: 'Light Green' },
+    { key: 'downFast', symbol: '↓', planSymbol: '↓↓', name: 'Falling quickly', rate: 'more than 2 mg/dL per minute', libreTrend: 1, adjust: -3, colour: '#00B050', text: '#FFFFFF', colourName: 'Green' }
   ],
 
   // Blood sugar box colours (Excel standard colours), checked top to bottom
@@ -111,15 +114,12 @@ const APP_SETTINGS = {
   libre: { maxAgeMinutes: 10, futureToleranceMinutes: 2, min: 40, max: 500 }
 };
 
-// Libre trend arrows (LibreLinkUp TrendArrow 1–5), shown exactly as the Libre app shows them.
-// They are NOT turned into a calculator arrow automatically – the arrow is still tapped by hand.
-const LIBRE_ARROWS = {
-  1: { symbol: '↓', name: 'falling quickly' },
-  2: { symbol: '↘', name: 'falling' },
-  3: { symbol: '→', name: 'changing slowly' },
-  4: { symbol: '↗', name: 'rising' },
-  5: { symbol: '↑', name: 'rising quickly' }
-};
+// The arrow for a LibreLinkUp TrendArrow number (1–5), or null. It is shown in the Libre box but NOT
+// selected automatically – the arrow is still tapped by hand in the calculator.
+function libreArrow(trend) {
+  const n = Number(trend);
+  return DOSE_PLAN.arrows.find((a) => a.libreTrend === n) || null;
+}
 
 /* ==========================================================================
    CALCULATIONS – pure functions, no screen code (tested in tests/calc.test.js)
@@ -308,7 +308,7 @@ function checkLibreReading(params, now) {
   const value = Math.round(Number(raw));
 
   const ageMinutes = (now.getTime() - takenAt.getTime()) / 60000;
-  const arrow = LIBRE_ARROWS[Number(get('trend'))] || null;
+  const arrow = get('trend') === '' ? null : libreArrow(get('trend'));
   const base = { value, takenAt, ageMinutes, arrow };
 
   if (value < limits.min || value > limits.max) return Object.assign({ ok: false, reason: 'range' }, base);
@@ -417,9 +417,9 @@ function initApp() {
   const arrowBtns = plan.arrows.map((arrow) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'arrow-btn' + (arrow.symbol.length > 1 ? ' dbl' : '');
+    b.className = 'arrow-btn';
     b.dataset.arrow = arrow.key;
-    b.textContent = arrow.symbol;
+    b.appendChild(arrowIcon(arrow.key));
     b.setAttribute('aria-label', arrow.name);
     b.style.setProperty('--sel-bg', arrow.colour);
     b.style.setProperty('--sel-fg', arrow.text);
@@ -533,8 +533,10 @@ function initApp() {
       card.appendChild(h('p', { class: 'libre-time', text: 'Taken at ' + timeText(result.takenAt) + ' (' + ageText(result.ageMinutes) + ')' }));
       if (result.arrow) {
         const arrow = h('p', { class: 'libre-arrow' }, ['Libre arrow: ']);
-        arrow.appendChild(h('b', { text: result.arrow.symbol }));
-        arrow.appendChild(document.createTextNode(' ' + result.arrow.name + '. After using the reading, tap the arrow in the calculator yourself, as the care plan says.'));
+        arrow.appendChild(arrowIcon(result.arrow.key, 'libre-arrow-big'));
+        arrow.appendChild(document.createTextNode(' ' + result.arrow.name + '. After using the reading, tap '));
+        arrow.appendChild(arrowIcon(result.arrow.key));
+        arrow.appendChild(document.createTextNode(' in the calculator.'));
         card.appendChild(arrow);
       } else {
         card.appendChild(h('p', { class: 'libre-arrow', text: 'No arrow from Libre. Check the Libre app for the arrow.' }));
@@ -772,6 +774,28 @@ function initApp() {
   showLibreSheet();
 }
 
+/* ---- Trend arrow icon: one arrow shape turned to the angle the Libre app uses,
+        so all five look the same on every phone (the font's ↗ and ↘ differ from ↑ → ↓) ---- */
+const ARROW_ANGLES = { upFast: -90, up: -45, steady: 0, down: 45, downFast: 90 };
+function arrowIcon(key, extraClass) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', 'arrow-icon' + (extraClass ? ' ' + extraClass : ''));
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute('d', 'M3.5 12H20M13.5 5.5L20 12l-6.5 6.5');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', 'currentColor');
+  path.setAttribute('stroke-width', '3');
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-linejoin', 'round');
+  path.setAttribute('transform', 'rotate(' + (ARROW_ANGLES[key] || 0) + ' 12 12)');
+  svg.appendChild(path);
+  return svg;
+}
+
 /* ---- Small helper to build elements without innerHTML ---- */
 function h(tag, attrs, children) {
   const el = document.createElement(tag);
@@ -793,7 +817,9 @@ function table(headers, rows, cls) {
       h('tbody', null, rows.map((row) => h('tr', null, row.map((cell, i) => {
         if (cell && typeof cell === 'object' && cell.swatch) {
           const td = h(i === 0 ? 'th' : 'td', i === 0 ? { scope: 'row' } : null);
-          const sw = h('span', { class: 'swatch', text: cell.text });
+          const sw = cell.arrowKey
+            ? h('span', { class: 'swatch', role: 'img', 'aria-label': cell.text }, [arrowIcon(cell.arrowKey)])
+            : h('span', { class: 'swatch', text: cell.text });
           sw.style.setProperty('--bg', cell.swatch);
           sw.style.setProperty('--fg', cell.fg);
           td.appendChild(sw);
@@ -831,9 +857,10 @@ function buildPlanPage(root) {
   root.appendChild(h('p', { class: 'note', text: 'The row used is the highest band the reading has reached.' }));
 
   root.appendChild(h('h3', { text: 'Trend arrow adjustment (units)' }));
-  root.appendChild(table(['Arrow', 'Units', 'Meaning'],
-    p.arrows.map((a) => [{ swatch: a.colour, fg: a.text, text: a.symbol }, signed(a.adjust), a.name])
-      .concat([['Blank', '0', 'No arrow']])));
+  root.appendChild(table(['Libre arrow', 'Written plan', 'Units', 'Meaning'],
+    p.arrows.map((a) => [{ swatch: a.colour, fg: a.text, text: a.name, arrowKey: a.key }, a.planSymbol, signed(a.adjust), a.name + ' (' + a.rate + ')'])
+      .concat([['Blank', '', '0', 'No arrow']])));
+  root.appendChild(h('p', { class: 'note', text: 'Arrows are shown as in the FreeStyle Libre app. “Written plan” shows the same arrow as drawn in the written plan.' }));
 
   root.appendChild(h('h3', { text: 'Blood sugar colours' }));
   root.appendChild(table(['Colour', 'Blood sugar mg/dL'],
@@ -852,7 +879,7 @@ function buildHelpPage(root) {
   root.appendChild(h('ol', { class: 'steps' }, [
     'Check the Meal Time. Breakfast, Lunch, Dinner or Bedtime is picked from the phone’s clock – tap another one to change it.',
     'Type the Blood Sugar Reading (mg/dL). If you opened the calculator with the Libre Shortcut, check the reading and its time in the box that appears, then tap Use this reading.',
-    'Tap the trend arrow from the sensor. Tap it again to clear it. Leave it blank if there is no arrow.',
+    'Tap the same trend arrow the Libre app shows. Tap it again to clear it. Leave it blank if there is no arrow.',
     'For each food type its name and its carbs in grams. A row only counts when both are filled in (an orange dashed box means something is missing).',
     'Read the yellow TOTAL and the message just under it. Check against the written plan before injecting.',
     'Tap Clear before the next reading. The app also clears itself after ' + APP_SETTINGS.autoClearMinutes + ' minutes in the background.'
@@ -864,7 +891,7 @@ function buildHelpPage(root) {
     'The Libre Shortcut gets the latest reading from LibreLinkUp and opens the calculator with a box showing the reading and when it was taken.',
     'Nothing is used until you tap Use this reading. Readings older than ' + libre.maxAgeMinutes + ' minutes, LO or HI are refused – then check the Libre app and type the reading.',
     'A Libre reading is removed from the calculator once it is more than ' + libre.maxAgeMinutes + ' minutes old.',
-    'The arrow is not filled in for you. The box shows the Libre arrow; tap the arrow in the calculator yourself, as the care plan says (the arrow box is marked orange until you do).',
+    'The arrow is not filled in for you. The box shows the Libre arrow; tap the same arrow in the calculator (the arrow box is marked orange until you do).',
     'LibreLinkUp can be a few minutes behind the Libre app. If the number looks wrong, check the Libre app or do a finger-prick check.'
   ].map((t) => h('li', { text: t }))));
 
@@ -896,6 +923,6 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     DOSE_PLAN, APP_SETTINGS, toNumber, roundHalfUp, formatUnits, findMeal, findArrow, arrowAdjustment,
     correctionRow, correctionDose, foodDose, messageFor, readingColour, arrowColour, mealForTime,
-    mealInfoText, calculate, LIBRE_ARROWS, parseLibreTime, checkLibreReading, ageText, libreProblemText
+    mealInfoText, calculate, libreArrow, parseLibreTime, checkLibreReading, ageText, libreProblemText
   };
 }

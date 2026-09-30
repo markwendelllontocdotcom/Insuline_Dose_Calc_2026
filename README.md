@@ -55,6 +55,9 @@ The files contain no name or other personal details.
 
 - The meal time is picked from the phone’s clock (05:00–10:59 Breakfast, 11:00–15:59 Lunch,
   16:00–20:59 Dinner, otherwise Bedtime). Tap another meal time to change it.
+- The arrow buttons look like the FreeStyle Libre arrows (↑ rising quickly, ↗ rising, → changing slowly,
+  ↘ falling, ↓ falling quickly). The **Plan** tab shows each one next to the arrow used in the written plan
+  (Libre ↑ = plan ↑↑, ↗ = ↑, ↘ = ↓, ↓ = ↓↓) and its units.
 - The message (for example “Above 180 …”) sits right under the yellow Total.
 - A food row only counts when it has both a name and carbs. An orange dashed box shows which part is missing.
 - While the keypad is open the iPhone may slide the screen up. If that hides the Total, the reading or the
@@ -67,8 +70,8 @@ The files contain no name or other personal details.
 An iPhone Shortcut on the child's phone signs in to **LibreLinkUp** (Abbott's caregiver service), gets the latest
 reading and opens the calculator. A box shows the reading and when it was taken; nothing is used until
 **Use this reading** is tapped. Readings older than 10 minutes, LO and HI are refused, and a used reading is
-removed from the calculator once it is more than 10 minutes old. The Libre arrow is shown, but the arrow in the
-calculator is still tapped by hand, as the care plan says.
+removed from the calculator once it is more than 10 minutes old. The Libre arrow is shown; tap the same arrow in
+the calculator (it is not selected for you).
 
 This uses LibreLinkUp in an unofficial way. It can stop working whenever Abbott changes LibreLinkUp, and it needs
 internet when it runs. LibreLinkUp can be a few minutes behind the Libre app. If it stops working, open the

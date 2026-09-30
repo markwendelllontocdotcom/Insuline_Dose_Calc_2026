@@ -80,7 +80,7 @@ test('5. 200, →, Bedtime, 45 g → correction 2 u, food 6 u, total 8 u, flashi
   assertMessage(r, HIGH, 'red', true);
 });
 
-test('6. 400, ↓↓, Bedtime → correction 5 u, flashing Above 180', () => {
+test('6. 400, ↓ falling quickly, Bedtime → correction 5 u, flashing Above 180', () => {
   const r = run('Bedtime', 400, 'downFast');
   assert.equal(r.correction.value, 5);
   assert.equal(r.total, 5);
@@ -203,7 +203,7 @@ test('Bedtime uses its own column', () => {
   assert.equal(correctionDose(400, 'Bedtime', null).value, 8);
 });
 
-test('Arrow adjustments: ↑↑ +3, ↑ +2, → 0, ↓ −2, ↓↓ −3, blank 0', () => {
+test('Arrow adjustments (Libre arrows): ↑ +3, ↗ +2, → 0, ↘ −2, ↓ −3, blank 0', () => {
   const base = 3; // Lunch, 200 mg/dL
   assert.equal(correctionDose(200, 'Lunch', 'upFast').value, base + 3);
   assert.equal(correctionDose(200, 'Lunch', 'up').value, base + 2);
@@ -211,7 +211,12 @@ test('Arrow adjustments: ↑↑ +3, ↑ +2, → 0, ↓ −2, ↓↓ −3, blank 
   assert.equal(correctionDose(200, 'Lunch', 'down').value, base - 2);
   assert.equal(correctionDose(200, 'Lunch', 'downFast').value, base - 3);
   assert.equal(correctionDose(200, 'Lunch', null).value, base);
-  assert.equal(correctionDose(200, 'Lunch', '↑↑').value, base + 3); // symbols work too
+  // Libre symbols work too
+  assert.equal(correctionDose(200, 'Lunch', '↑').value, base + 3);
+  assert.equal(correctionDose(200, 'Lunch', '↗').value, base + 2);
+  assert.equal(correctionDose(200, 'Lunch', '→').value, base);
+  assert.equal(correctionDose(200, 'Lunch', '↘').value, base - 2);
+  assert.equal(correctionDose(200, 'Lunch', '↓').value, base - 3);
 });
 
 test('No reading → correction blank, no message, no colour; total from food only', () => {
@@ -364,7 +369,9 @@ test('Libre reading: fresh reading is offered with its time and arrow', () => {
   assert.equal(r.value, 145);
   assert.equal(r.takenAt.toISOString(), '2026-09-30T08:41:12.000Z');
   assert.ok(Math.abs(r.ageMinutes - 3.8) < 0.01);
-  assert.deepEqual(r.arrow, { symbol: '↗', name: 'rising' });
+  assert.equal(r.arrow.key, 'up');
+  assert.equal(r.arrow.symbol, '↗');
+  assert.equal(r.arrow.adjust, 2);
   // Shortcut "+" spaces also work, and a missing or odd trend just means no arrow
   const plus = checkLibreReading(new URLSearchParams('libre=1&bg=98&ts=9/30/2026+8:44:00+AM'), now);
   assert.equal(plus.ok, true);
@@ -375,10 +382,15 @@ test('Libre reading: fresh reading is offered with its time and arrow', () => {
 
 test('Libre reading: every trend arrow', () => {
   const now = new Date('2026-09-30T08:45:00Z');
-  const symbols = { 1: '↓', 2: '↘', 3: '→', 4: '↗', 5: '↑' };
-  for (const [trend, symbol] of Object.entries(symbols)) {
+  const expected = { 1: ['↓', 'downFast', -3], 2: ['↘', 'down', -2], 3: ['→', 'steady', 0], 4: ['↗', 'up', 2], 5: ['↑', 'upFast', 3] };
+  for (const [trend, [symbol, key, adjust]] of Object.entries(expected)) {
     const r = checkLibreReading({ libre: '1', bg: '120', ts: '9/30/2026 8:44:00 AM', trend }, now);
     assert.equal(r.arrow.symbol, symbol, trend);
+    assert.equal(r.arrow.key, key, trend);
+    assert.equal(r.arrow.adjust, adjust, trend);
+  }
+  for (const trend of ['0', '6', 'x', '']) {
+    assert.equal(checkLibreReading({ libre: '1', bg: '120', ts: '9/30/2026 8:44:00 AM', trend }, now).arrow, null, trend);
   }
 });
 

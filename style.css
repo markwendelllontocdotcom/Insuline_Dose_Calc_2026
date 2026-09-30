@@ -260,7 +260,6 @@ p, h1, h2, h3 { margin: 0; }
   font-weight: 900;
   line-height: 1;
 }
-.arrow-btn.dbl { letter-spacing: -0.2em; text-indent: -0.2em; }
 .arrow-btn.on {
   background: var(--sel-bg);
   color: var(--sel-fg);
@@ -589,7 +588,6 @@ p, h1, h2, h3 { margin: 0; }
 .libre-value span { margin-left: 6px; font-size: 18px; font-weight: 700; }
 .libre-time { font-size: 18px; font-weight: 800; }
 .libre-arrow { font-size: 16px; line-height: 1.35; }
-.libre-arrow b { font-size: 28px; vertical-align: -3px; }
 .libre-problem { font-size: 18px; font-weight: 700; line-height: 1.35; color: #C00000; }
 .libre-btns { display: flex; flex-direction: column; gap: 10px; margin-top: 2px; }
 .libre-btns button {
@@ -603,3 +601,10 @@ p, h1, h2, h3 { margin: 0; }
 }
 .libre-btns .primary { background: #00703C; border-color: #00703C; color: #fff; }
 .libre-btns button:focus-visible { outline: 3px solid #0070C0; outline-offset: 2px; }
+
+/* Trend arrow icon (drawn, so every arrow looks the same) */
+.arrow-icon { display: inline-block; width: 1.05em; height: 1.05em; vertical-align: -0.17em; }
+.arrow-btn .arrow-icon { width: 1.15em; height: 1.15em; vertical-align: middle; }
+.libre-arrow .arrow-icon { width: 1.25em; height: 1.25em; vertical-align: -0.3em; }
+.libre-arrow .libre-arrow-big { width: 1.8em; height: 1.8em; vertical-align: -0.55em; }
+.swatch .arrow-icon { width: 1.3em; height: 1.3em; vertical-align: middle; }
