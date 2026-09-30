@@ -352,7 +352,7 @@ function initApp() {
   function freshState() {
     const foods = [];
     for (let i = 0; i < APP_SETTINGS.foodRows; i++) foods.push({ name: '', carbs: '' });
-    return { meal: mealForTime(new Date()), reading: '', arrow: null, foods, libreArrowPending: false, libreTakenAt: null };
+    return { meal: mealForTime(new Date()), reading: '', arrow: null, foods, libreTakenAt: null, libreArrowKey: null };
   }
   const state = freshState();
 
@@ -426,6 +426,7 @@ function initApp() {
     b.addEventListener('click', () => {
       closeKeypad();
       state.arrow = state.arrow === arrow.key ? null : arrow.key;
+      state.libreArrowKey = null; // chosen by hand from now on
       render();
     });
     els.arrowGrid.appendChild(b);
@@ -437,8 +438,12 @@ function initApp() {
     const clean = els.reading.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, 3);
     if (clean !== els.reading.value) els.reading.value = clean;
     state.reading = clean;
-    state.libreTakenAt = null;       // typed by hand: no longer the Libre reading
-    state.libreArrowPending = false;
+    if (state.libreTakenAt) {
+      // Typed by hand: no longer the Libre reading, so the arrow Libre selected goes too
+      if (state.libreArrowKey && state.arrow === state.libreArrowKey) state.arrow = null;
+      state.libreTakenAt = null;
+      state.libreArrowKey = null;
+    }
     render();
   });
 
@@ -478,8 +483,8 @@ function initApp() {
     state.reading = '';
     state.arrow = null;
     state.foods = fresh.foods;
-    state.libreArrowPending = false;
     state.libreTakenAt = null;
+    state.libreArrowKey = null;
     closeLibreSheet();
     els.reading.value = '';
     els.names.forEach((n) => { n.value = ''; });
@@ -534,12 +539,12 @@ function initApp() {
       if (result.arrow) {
         const arrow = h('p', { class: 'libre-arrow' }, ['Libre arrow: ']);
         arrow.appendChild(arrowIcon(result.arrow.key, 'libre-arrow-big'));
-        arrow.appendChild(document.createTextNode(' ' + result.arrow.name + '. After using the reading, tap '));
+        arrow.appendChild(document.createTextNode(' ' + result.arrow.name + '. Use this reading also selects '));
         arrow.appendChild(arrowIcon(result.arrow.key));
         arrow.appendChild(document.createTextNode(' in the calculator.'));
         card.appendChild(arrow);
       } else {
-        card.appendChild(h('p', { class: 'libre-arrow', text: 'No arrow from Libre. Check the Libre app for the arrow.' }));
+        card.appendChild(h('p', { class: 'libre-arrow', text: 'No arrow from Libre. Check the Libre app and tap the arrow yourself.' }));
       }
 
       const use = h('button', { type: 'button', class: 'primary', text: 'Use this reading' });
@@ -548,7 +553,8 @@ function initApp() {
         if (!now || !now.ok) { showLibreSheet(); return; } // became too old while the box was open
         state.reading = String(now.value);
         els.reading.value = state.reading;
-        state.libreArrowPending = !!now.arrow;
+        state.arrow = now.arrow ? now.arrow.key : null;
+        state.libreArrowKey = state.arrow;
         state.libreTakenAt = now.takenAt;
         closeLibreSheet();
         render();
@@ -623,8 +629,6 @@ function initApp() {
     });
     if (r.arrowColour) els.arrowBox.dataset.colour = r.arrowColour.name;
     else delete els.arrowBox.dataset.colour;
-    // After using a Libre reading that had an arrow, the arrow box stays marked until an arrow is tapped
-    els.arrowBox.classList.toggle('needs', state.libreArrowPending && !state.arrow);
 
     els.correction.textContent = r.correction.text;
     els.correction.classList.toggle('small', r.correction.kind === 'notNeeded');
@@ -759,8 +763,9 @@ function initApp() {
       if (ageMinutes > APP_SETTINGS.libre.maxAgeMinutes) {
         state.reading = '';
         els.reading.value = '';
+        state.arrow = null; // the arrow belonged to that reading too, even if changed by hand
         state.libreTakenAt = null;
-        state.libreArrowPending = false;
+        state.libreArrowKey = null;
         closeKeypad();
         render();
         showLibreSheet({ ok: false, reason: 'expired', ageMinutes });
@@ -890,8 +895,8 @@ function buildHelpPage(root) {
   root.appendChild(h('ul', { class: 'reminders' }, [
     'The Libre Shortcut gets the latest reading from LibreLinkUp and opens the calculator with a box showing the reading and when it was taken.',
     'Nothing is used until you tap Use this reading. Readings older than ' + libre.maxAgeMinutes + ' minutes, LO or HI are refused – then check the Libre app and type the reading.',
-    'A Libre reading is removed from the calculator once it is more than ' + libre.maxAgeMinutes + ' minutes old.',
-    'The arrow is not filled in for you. The box shows the Libre arrow; tap the same arrow in the calculator (the arrow box is marked orange until you do).',
+    'A Libre reading and its arrow are removed from the calculator once the reading is more than ' + libre.maxAgeMinutes + ' minutes old, or when you type a reading yourself.',
+    'Use this reading also selects the Libre arrow. Check it matches the Libre app; tap another arrow to change it.',
     'LibreLinkUp can be a few minutes behind the Libre app. If the number looks wrong, check the Libre app or do a finger-prick check.'
   ].map((t) => h('li', { text: t }))));
 

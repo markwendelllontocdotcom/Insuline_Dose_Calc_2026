@@ -70,8 +70,8 @@ The files contain no name or other personal details.
 An iPhone Shortcut on the child's phone signs in to **LibreLinkUp** (Abbott's caregiver service), gets the latest
 reading and opens the calculator. A box shows the reading and when it was taken; nothing is used until
 **Use this reading** is tapped. Readings older than 10 minutes, LO and HI are refused, and a used reading is
-removed from the calculator once it is more than 10 minutes old. The Libre arrow is shown; tap the same arrow in
-the calculator (it is not selected for you).
+removed from the calculator once it is more than 10 minutes old. **Use this reading** also selects the Libre arrow
+in the calculator; check it and tap another arrow to change it.
 
 This uses LibreLinkUp in an unofficial way. It can stop working whenever Abbott changes LibreLinkUp, and it needs
 internet when it runs. LibreLinkUp can be a few minutes behind the Libre app. If it stops working, open the
