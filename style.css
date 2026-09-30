@@ -548,3 +548,58 @@ p, h1, h2, h3 { margin: 0; }
 .hud-reading:empty { display: none; }
 .hud-reading::after { content: " mg/dL"; font-size: 11px; font-weight: 700; margin-left: 4px; }
 .hud .message { min-height: 40px; font-size: 15px; }
+
+/* ---------- Reading from the Libre Shortcut (box over the calculator) ---------- */
+.libre-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--sat) + 16px) calc(var(--sar) + 16px) calc(var(--sab) + 16px) calc(var(--sal) + 16px);
+  background: rgba(0, 0, 0, 0.55);
+}
+.libre-card {
+  width: 100%;
+  max-width: 380px;
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 16px 16px;
+  background: #fff;
+  border: 2.5px solid #000;
+  border-radius: 12px;
+  text-align: center;
+}
+.libre-card h2 { font-size: 19px; font-weight: 800; }
+.libre-value {
+  padding: 10px 8px;
+  border: 2px solid #000;
+  border-radius: 8px;
+  background: var(--bg, #fff);
+  color: var(--fg, #000);
+  font-size: 56px;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.libre-value span { margin-left: 6px; font-size: 18px; font-weight: 700; }
+.libre-time { font-size: 18px; font-weight: 800; }
+.libre-arrow { font-size: 16px; line-height: 1.35; }
+.libre-arrow b { font-size: 28px; vertical-align: -3px; }
+.libre-problem { font-size: 18px; font-weight: 700; line-height: 1.35; color: #C00000; }
+.libre-btns { display: flex; flex-direction: column; gap: 10px; margin-top: 2px; }
+.libre-btns button {
+  min-height: 52px;
+  padding: 8px 12px;
+  background: #fff;
+  border: 2px solid #000;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 800;
+}
+.libre-btns .primary { background: #00703C; border-color: #00703C; color: #fff; }
+.libre-btns button:focus-visible { outline: 3px solid #0070C0; outline-offset: 2px; }

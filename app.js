@@ -104,7 +104,21 @@ const APP_SETTINGS = {
   foodRows: 3,
   // Everything is cleared when the app comes back after this long in the background,
   // so an old reading is never shown as if it were new.
-  autoClearMinutes: 30
+  autoClearMinutes: 30,
+  // Reading sent by the Libre Shortcut (see README): refused when older than this,
+  // or when it is more than a couple of minutes "in the future" (phone clock wrong),
+  // or outside the range the sensor can show (below 40 = LO, above 500 = HI).
+  libre: { maxAgeMinutes: 10, futureToleranceMinutes: 2, min: 40, max: 500 }
+};
+
+// Libre trend arrows (LibreLinkUp TrendArrow 1–5), shown exactly as the Libre app shows them.
+// They are NOT turned into a calculator arrow automatically – the arrow is still tapped by hand.
+const LIBRE_ARROWS = {
+  1: { symbol: '↓', name: 'falling quickly' },
+  2: { symbol: '↘', name: 'falling' },
+  3: { symbol: '→', name: 'changing slowly' },
+  4: { symbol: '↗', name: 'rising' },
+  5: { symbol: '↑', name: 'rising quickly' }
 };
 
 /* ==========================================================================
@@ -249,6 +263,86 @@ function calculate(input) {
 }
 
 /* ==========================================================================
+   READING FROM THE LIBRE SHORTCUT – pure functions (tested in tests/calc.test.js)
+   The Shortcut opens the calculator with ?libre=1&bg=145&ts=9/30/2026 8:41:12 AM&trend=4
+   (ts is LibreLinkUp's FactoryTimestamp, which is UTC). Nothing is sent anywhere.
+   ========================================================================== */
+
+// "9/30/2026 8:41:12 AM" (UTC) → Date, or null if it is not a real date and time
+function parseLibreTime(text) {
+  const s = String(text === null || text === undefined ? '' : text).trim();
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i.exec(s);
+  if (!m) return null;
+  const month = Number(m[1]);
+  const day = Number(m[2]);
+  const year = Number(m[3]);
+  let hour = Number(m[4]);
+  const minute = Number(m[5]);
+  const second = Number(m[6] || 0);
+  if (m[7]) {
+    if (hour < 1 || hour > 12) return null;
+    hour = (hour % 12) + (m[7].toUpperCase() === 'PM' ? 12 : 0);
+  } else if (hour > 23) {
+    return null;
+  }
+  if (minute > 59 || second > 59) return null;
+  const date = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return date;
+}
+
+// Checks what the Shortcut sent. params: anything with get(name) (URLSearchParams) or a plain object.
+// Returns null when the calculator was not opened by the Shortcut, otherwise
+// { ok: true, value, takenAt, ageMinutes, arrow } or { ok: false, reason, … }.
+function checkLibreReading(params, now) {
+  const get = (k) => {
+    const v = params && typeof params.get === 'function' ? params.get(k) : (params ? params[k] : undefined);
+    return v === null || v === undefined ? '' : String(v).trim();
+  };
+  if (get('libre') === '') return null;
+  const limits = APP_SETTINGS.libre;
+
+  const takenAt = parseLibreTime(get('ts'));
+  const raw = get('bg');
+  if (takenAt === null || !/^\d{1,3}(\.\d+)?$/.test(raw)) return { ok: false, reason: 'missing' };
+  const value = Math.round(Number(raw));
+
+  const ageMinutes = (now.getTime() - takenAt.getTime()) / 60000;
+  const arrow = LIBRE_ARROWS[Number(get('trend'))] || null;
+  const base = { value, takenAt, ageMinutes, arrow };
+
+  if (value < limits.min || value > limits.max) return Object.assign({ ok: false, reason: 'range' }, base);
+  if (ageMinutes < -limits.futureToleranceMinutes) return Object.assign({ ok: false, reason: 'future' }, base);
+  if (ageMinutes > limits.maxAgeMinutes) return Object.assign({ ok: false, reason: 'old' }, base);
+  return Object.assign({ ok: true }, base);
+}
+
+// "just now", "1 min ago", "7 min ago", "2 h 5 min ago"
+function ageText(ageMinutes) {
+  const m = Math.max(0, Math.floor(ageMinutes));
+  if (m < 1) return 'just now';
+  if (m < 60) return m + ' min ago';
+  const hours = Math.floor(m / 60);
+  const rest = m % 60;
+  return hours + ' h' + (rest ? ' ' + rest + ' min' : '') + ' ago';
+}
+
+// What the Libre box says when a reading cannot be used
+function libreProblemText(result) {
+  const limits = APP_SETTINGS.libre;
+  switch (result.reason) {
+    case 'missing': return 'Could not get a reading from Libre. Check the Libre app and type the reading yourself.';
+    case 'range': return 'Libre shows ' + (result.value < limits.min ? 'LO' : 'HI') + '. Do a finger-prick check and type the reading yourself.';
+    case 'future': return 'The reading time does not match this phone’s clock. Check the Libre app and type the reading yourself.';
+    case 'expired': return 'The Libre reading is now ' + ageText(result.ageMinutes).replace(' ago', ' old') +
+      ', so it was removed from the calculator. Check the Libre app and type the current reading.';
+    case 'old': return 'The latest Libre reading is from ' + ageText(result.ageMinutes) + ' – too old to use (more than ' +
+      limits.maxAgeMinutes + ' minutes). Check the Libre app and type the current reading.';
+    default: return 'Could not use the Libre reading. Type it yourself.';
+  }
+}
+
+/* ==========================================================================
    SCREEN
    ========================================================================== */
 function initApp() {
@@ -258,9 +352,17 @@ function initApp() {
   function freshState() {
     const foods = [];
     for (let i = 0; i < APP_SETTINGS.foodRows; i++) foods.push({ name: '', carbs: '' });
-    return { meal: mealForTime(new Date()), reading: '', arrow: null, foods };
+    return { meal: mealForTime(new Date()), reading: '', arrow: null, foods, libreArrowPending: false, libreTakenAt: null };
   }
   const state = freshState();
+
+  // Reading sent by the Libre Shortcut in the address (?libre=1&bg=…&ts=…&trend=…)
+  let libreSheet = null;
+  const libreParams = {};
+  if (location.search) {
+    const sp = new URLSearchParams(location.search);
+    ['libre', 'bg', 'ts', 'trend'].forEach((k) => { if (sp.has(k)) libreParams[k] = sp.get(k); });
+  }
 
   const els = {
     total: $('total-num'),
@@ -335,6 +437,8 @@ function initApp() {
     const clean = els.reading.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, 3);
     if (clean !== els.reading.value) els.reading.value = clean;
     state.reading = clean;
+    state.libreTakenAt = null;       // typed by hand: no longer the Libre reading
+    state.libreArrowPending = false;
     render();
   });
 
@@ -374,6 +478,9 @@ function initApp() {
     state.reading = '';
     state.arrow = null;
     state.foods = fresh.foods;
+    state.libreArrowPending = false;
+    state.libreTakenAt = null;
+    closeLibreSheet();
     els.reading.value = '';
     els.names.forEach((n) => { n.value = ''; });
     els.carbs.forEach((c) => { c.value = ''; });
@@ -383,8 +490,80 @@ function initApp() {
   els.clear.addEventListener('click', resetAll);
 
   function isPristine() {
-    return state.reading === '' && !state.arrow &&
+    return !libreSheet && state.reading === '' && !state.arrow &&
       state.foods.every((f) => f.name.trim() === '' && f.carbs === '');
+  }
+
+  /* ---- Libre reading box: shown over the calculator; nothing is used until "Use this reading" is tapped ---- */
+  function closeLibreSheet() {
+    if (libreSheet) {
+      libreSheet.remove();
+      libreSheet = null;
+    }
+    // Forget the reading in the address so a reload never shows it again
+    if (location.search) {
+      try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* ignore */ }
+    }
+  }
+
+  function timeText(date) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function typeItMyself() {
+    closeLibreSheet();
+    els.reading.focus();
+  }
+
+  function showLibreSheet(ready) {
+    const result = ready || checkLibreReading(libreParams, new Date());
+    if (!result) return;
+    if (libreSheet) libreSheet.remove();
+    closeKeypad();
+
+    const card = h('div', { class: 'libre-card' });
+    card.appendChild(h('h2', { id: 'libre-title', text: 'Reading from Libre' }));
+    const buttons = h('div', { class: 'libre-btns' });
+
+    if (result.ok) {
+      const value = h('p', { class: 'libre-value' }, [String(result.value)]);
+      value.appendChild(h('span', { text: 'mg/dL' }));
+      setColours(value, readingColour(result.value));
+      card.appendChild(value);
+      card.appendChild(h('p', { class: 'libre-time', text: 'Taken at ' + timeText(result.takenAt) + ' (' + ageText(result.ageMinutes) + ')' }));
+      if (result.arrow) {
+        const arrow = h('p', { class: 'libre-arrow' }, ['Libre arrow: ']);
+        arrow.appendChild(h('b', { text: result.arrow.symbol }));
+        arrow.appendChild(document.createTextNode(' ' + result.arrow.name + '. After using the reading, tap the arrow in the calculator yourself, as the care plan says.'));
+        card.appendChild(arrow);
+      } else {
+        card.appendChild(h('p', { class: 'libre-arrow', text: 'No arrow from Libre. Check the Libre app for the arrow.' }));
+      }
+
+      const use = h('button', { type: 'button', class: 'primary', text: 'Use this reading' });
+      use.addEventListener('click', () => {
+        const now = checkLibreReading(libreParams, new Date());
+        if (!now || !now.ok) { showLibreSheet(); return; } // became too old while the box was open
+        state.reading = String(now.value);
+        els.reading.value = state.reading;
+        state.libreArrowPending = !!now.arrow;
+        state.libreTakenAt = now.takenAt;
+        closeLibreSheet();
+        render();
+      });
+      buttons.appendChild(use);
+      buttons.appendChild(h('button', { type: 'button', text: 'Type it myself' }));
+    } else {
+      card.appendChild(h('p', { class: 'libre-problem', text: libreProblemText(result) }));
+      buttons.appendChild(h('button', { type: 'button', class: 'primary', text: 'Type the reading myself' }));
+    }
+    buttons.lastChild.addEventListener('click', typeItMyself);
+    card.appendChild(buttons);
+
+    libreSheet = h('div', { class: 'libre-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'libre-title' }, [card]);
+    libreSheet.dataset.kind = ready ? 'expired' : 'offer';
+    document.getElementById('app').appendChild(libreSheet);
+    buttons.firstChild.focus();
   }
 
   function setColours(el, colour) {
@@ -442,6 +621,8 @@ function initApp() {
     });
     if (r.arrowColour) els.arrowBox.dataset.colour = r.arrowColour.name;
     else delete els.arrowBox.dataset.colour;
+    // After using a Libre reading that had an arrow, the arrow box stays marked until an arrow is tapped
+    els.arrowBox.classList.toggle('needs', state.libreArrowPending && !state.arrow);
 
     els.correction.textContent = r.correction.text;
     els.correction.classList.toggle('small', r.correction.kind === 'notNeeded');
@@ -567,7 +748,28 @@ function initApp() {
     }).catch(() => {});
   }
 
+  function checkLibreAge() {
+    if (libreSheet && libreSheet.dataset.kind === 'offer') {
+      showLibreSheet(); // refresh the age text (or show "too old")
+    }
+    if (state.libreTakenAt) {
+      const ageMinutes = (Date.now() - state.libreTakenAt.getTime()) / 60000;
+      if (ageMinutes > APP_SETTINGS.libre.maxAgeMinutes) {
+        state.reading = '';
+        els.reading.value = '';
+        state.libreTakenAt = null;
+        state.libreArrowPending = false;
+        closeKeypad();
+        render();
+        showLibreSheet({ ok: false, reason: 'expired', ageMinutes });
+      }
+    }
+  }
+  setInterval(checkLibreAge, 30000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkLibreAge(); });
+
   render();
+  showLibreSheet();
 }
 
 /* ---- Small helper to build elements without innerHTML ---- */
@@ -649,11 +851,21 @@ function buildHelpPage(root) {
   root.appendChild(h('h3', { text: 'How to use' }));
   root.appendChild(h('ol', { class: 'steps' }, [
     'Check the Meal Time. Breakfast, Lunch, Dinner or Bedtime is picked from the phone’s clock – tap another one to change it.',
-    'Type the Blood Sugar Reading (mg/dL).',
+    'Type the Blood Sugar Reading (mg/dL). If you opened the calculator with the Libre Shortcut, check the reading and its time in the box that appears, then tap Use this reading.',
     'Tap the trend arrow from the sensor. Tap it again to clear it. Leave it blank if there is no arrow.',
     'For each food type its name and its carbs in grams. A row only counts when both are filled in (an orange dashed box means something is missing).',
     'Read the yellow TOTAL and the message just under it. Check against the written plan before injecting.',
     'Tap Clear before the next reading. The app also clears itself after ' + APP_SETTINGS.autoClearMinutes + ' minutes in the background.'
+  ].map((t) => h('li', { text: t }))));
+
+  const libre = APP_SETTINGS.libre;
+  root.appendChild(h('h3', { text: 'Reading from Libre (Shortcut)' }));
+  root.appendChild(h('ul', { class: 'reminders' }, [
+    'The Libre Shortcut gets the latest reading from LibreLinkUp and opens the calculator with a box showing the reading and when it was taken.',
+    'Nothing is used until you tap Use this reading. Readings older than ' + libre.maxAgeMinutes + ' minutes, LO or HI are refused – then check the Libre app and type the reading.',
+    'A Libre reading is removed from the calculator once it is more than ' + libre.maxAgeMinutes + ' minutes old.',
+    'The arrow is not filled in for you. The box shows the Libre arrow; tap the arrow in the calculator yourself, as the care plan says (the arrow box is marked orange until you do).',
+    'LibreLinkUp can be a few minutes behind the Libre app. If the number looks wrong, check the Libre app or do a finger-prick check.'
   ].map((t) => h('li', { text: t }))));
 
   root.appendChild(h('h3', { text: 'Reminders' }));
@@ -684,6 +896,6 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     DOSE_PLAN, APP_SETTINGS, toNumber, roundHalfUp, formatUnits, findMeal, findArrow, arrowAdjustment,
     correctionRow, correctionDose, foodDose, messageFor, readingColour, arrowColour, mealForTime,
-    mealInfoText, calculate
+    mealInfoText, calculate, LIBRE_ARROWS, parseLibreTime, checkLibreReading, ageText, libreProblemText
   };
 }

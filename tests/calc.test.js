@@ -334,3 +334,93 @@ test('Default meal time from the clock', () => {
   ];
   for (const [hh, mm, meal] of cases) assert.equal(mealForTime(at(hh, mm)), meal, `${hh}:${mm}`);
 });
+
+/* ---------------- Reading from the Libre Shortcut ---------------- */
+
+const { parseLibreTime, checkLibreReading, ageText, libreProblemText } = app;
+
+test('Libre time (UTC, as LibreLinkUp sends it) is read correctly', () => {
+  assert.equal(parseLibreTime('9/30/2026 8:41:12 AM').toISOString(), '2026-09-30T08:41:12.000Z');
+  assert.equal(parseLibreTime('9/30/2026 12:05:00 PM').toISOString(), '2026-09-30T12:05:00.000Z');
+  assert.equal(parseLibreTime('9/30/2026 12:05:00 AM').toISOString(), '2026-09-30T00:05:00.000Z');
+  assert.equal(parseLibreTime('10/1/2026 11:59:59 PM').toISOString(), '2026-10-01T23:59:59.000Z');
+  assert.equal(parseLibreTime('12/31/2026 23:10:00').toISOString(), '2026-12-31T23:10:00.000Z');
+  for (const bad of ['', null, undefined, '2026-09-30T08:41:12Z', '2/31/2026 8:00:00 AM', '9/30/2026 13:00:00 PM',
+    '9/30/2026 0:10:00 AM', '9/30/2026 8:61:00 AM', '9/30/2026', 'hello']) {
+    assert.equal(parseLibreTime(bad), null, String(bad));
+  }
+});
+
+test('Libre reading: only used when the Shortcut opened the calculator', () => {
+  const now = new Date('2026-09-30T08:45:00Z');
+  assert.equal(checkLibreReading(new URLSearchParams(''), now), null);
+  assert.equal(checkLibreReading(new URLSearchParams('bg=145&ts=9/30/2026 8:41:12 AM'), now), null);
+});
+
+test('Libre reading: fresh reading is offered with its time and arrow', () => {
+  const now = new Date('2026-09-30T08:45:00Z');
+  const r = checkLibreReading(new URLSearchParams('libre=1&bg=145&ts=9%2F30%2F2026%208%3A41%3A12%20AM&trend=4'), now);
+  assert.equal(r.ok, true);
+  assert.equal(r.value, 145);
+  assert.equal(r.takenAt.toISOString(), '2026-09-30T08:41:12.000Z');
+  assert.ok(Math.abs(r.ageMinutes - 3.8) < 0.01);
+  assert.deepEqual(r.arrow, { symbol: '↗', name: 'rising' });
+  // Shortcut "+" spaces also work, and a missing or odd trend just means no arrow
+  const plus = checkLibreReading(new URLSearchParams('libre=1&bg=98&ts=9/30/2026+8:44:00+AM'), now);
+  assert.equal(plus.ok, true);
+  assert.equal(plus.value, 98);
+  assert.equal(plus.arrow, null);
+  assert.equal(checkLibreReading({ libre: '1', bg: '98', ts: '9/30/2026 8:44:00 AM', trend: '9' }, now).arrow, null);
+});
+
+test('Libre reading: every trend arrow', () => {
+  const now = new Date('2026-09-30T08:45:00Z');
+  const symbols = { 1: '↓', 2: '↘', 3: '→', 4: '↗', 5: '↑' };
+  for (const [trend, symbol] of Object.entries(symbols)) {
+    const r = checkLibreReading({ libre: '1', bg: '120', ts: '9/30/2026 8:44:00 AM', trend }, now);
+    assert.equal(r.arrow.symbol, symbol, trend);
+  }
+});
+
+test('Libre reading: age limit is 10 minutes', () => {
+  const ts = '9/30/2026 8:00:00 AM';
+  const at = (mm, ss) => new Date(Date.UTC(2026, 8, 30, 8, mm, ss || 0));
+  assert.equal(checkLibreReading({ libre: '1', bg: '150', ts }, at(0)).ok, true);
+  assert.equal(checkLibreReading({ libre: '1', bg: '150', ts }, at(10)).ok, true);
+  const old = checkLibreReading({ libre: '1', bg: '150', ts }, at(10, 1));
+  assert.equal(old.ok, false);
+  assert.equal(old.reason, 'old');
+  assert.match(libreProblemText(old), /too old/);
+  // Slightly ahead of the phone clock is fine, well ahead is not
+  assert.equal(checkLibreReading({ libre: '1', bg: '150', ts }, new Date(Date.UTC(2026, 8, 30, 7, 58))).ok, true);
+  assert.equal(checkLibreReading({ libre: '1', bg: '150', ts }, new Date(Date.UTC(2026, 8, 30, 7, 57, 59))).reason, 'future');
+});
+
+test('Libre reading: LO, HI and broken values are refused', () => {
+  const now = new Date('2026-09-30T08:45:00Z');
+  const ts = '9/30/2026 8:44:00 AM';
+  assert.equal(checkLibreReading({ libre: '1', bg: '40', ts }, now).ok, true);
+  assert.equal(checkLibreReading({ libre: '1', bg: '500', ts }, now).ok, true);
+  const lo = checkLibreReading({ libre: '1', bg: '39', ts }, now);
+  assert.equal(lo.reason, 'range');
+  assert.match(libreProblemText(lo), /LO/);
+  const hi = checkLibreReading({ libre: '1', bg: '501', ts }, now);
+  assert.equal(hi.reason, 'range');
+  assert.match(libreProblemText(hi), /HI/);
+  for (const bg of ['', 'abc', '-5', '1e3', '1234', '12,5']) {
+    assert.equal(checkLibreReading({ libre: '1', bg, ts }, now).reason, 'missing', bg);
+  }
+  assert.equal(checkLibreReading({ libre: '1', bg: '120', ts: '' }, now).reason, 'missing');
+  assert.equal(checkLibreReading({ libre: '1', bg: '120.6', ts }, now).value, 121);
+  assert.equal(checkLibreReading({ libre: '1' }, now).reason, 'missing');
+  assert.match(libreProblemText({ ok: false, reason: 'expired', ageMinutes: 11.5 }), /now 11 min old, so it was removed/);
+});
+
+test('Libre age text', () => {
+  assert.equal(ageText(0.4), 'just now');
+  assert.equal(ageText(1.2), '1 min ago');
+  assert.equal(ageText(9.9), '9 min ago');
+  assert.equal(ageText(65), '1 h 5 min ago');
+  assert.equal(ageText(120), '2 h ago');
+  assert.equal(ageText(-1), 'just now');
+});
