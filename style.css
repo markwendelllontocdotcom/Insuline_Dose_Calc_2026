@@ -608,3 +608,83 @@ p, h1, h2, h3 { margin: 0; }
 .libre-arrow .arrow-icon { width: 1.25em; height: 1.25em; vertical-align: -0.3em; }
 .libre-arrow .libre-arrow-big { width: 1.8em; height: 1.8em; vertical-align: -0.55em; }
 .swatch .arrow-icon { width: 1.3em; height: 1.3em; vertical-align: middle; }
+
+/* ==========================================================================
+   BLACK BACKGROUND
+   Neutral parts (page, lines, headers, inputs, buttons, tabs) are dark.
+   The plan's colours stay exactly the same: the yellow Total, the reading
+   and arrow colours, and the red/green messages.
+   ========================================================================== */
+:root { color-scheme: dark; }
+html, body { background: #000; color: #fff; }
+.app {
+  --line: #E6E6E6;     /* lines around sections */
+  --grey: #333333;     /* header strips (were Excel light grey) */
+  --field: #1C1C1C;    /* inputs and buttons */
+  --field-line: #7A7A7A;
+}
+
+/* Anything on the plan's yellow keeps black text */
+.total, .chip.on, .hud-total, .doc .disclaimer { color: #000; }
+
+/* Header strips: dark grey with white text */
+.hdr, .box-h { color: #fff; }
+
+/* Meal time chips */
+.chip { background: var(--field); color: #fff; border-color: var(--field-line); }
+.chip.on {
+  background: var(--yellow);
+  color: #000;
+  border-color: #000;
+  box-shadow: inset 0 0 0 1.5px #000, 0 0 0 2px #fff;
+}
+.meal-info { color: #D9D9D9; }
+
+/* Reading, arrow and correction boxes (the reading keeps its plan colour once typed) */
+.box-b { background: var(--bg, #121212); color: var(--fg, #fff); }
+.box-reading:focus-within { box-shadow: 0 0 0 3px #fff; }
+.box-arrow .box-b { background: #121212; }
+.arrow-btn { background: var(--field); color: #fff; border-color: var(--field-line); }
+.arrow-btn.on { border-color: #000; box-shadow: inset 0 0 0 2px #000, 0 0 0 2px #fff; }
+
+/* Message area when empty */
+.message.empty { border-color: #555; }
+
+/* Carbohydrate rows */
+.rl { color: #fff; border-color: #666; }
+.food-name, .food-carbs { background: var(--field); color: #fff; border-color: var(--field-line); }
+.food-name::placeholder, .food-carbs::placeholder { color: #8F8F8F; }
+.food-name:focus, .food-carbs:focus { border-color: #fff; box-shadow: inset 0 0 0 1.5px #fff; }
+.food-dose { border-color: #555; }
+.food-dose.nofood { color: #ABABAB; }
+
+/* Clear button and reminder line */
+.clear-btn { background: #333; color: #fff; border-color: #8A8A8A; }
+.clear-btn:active { background: #555; }
+.reminder { color: #D9D9D9; }
+
+/* Tab bar */
+.tabbar { background: #111; border-top-color: #555; }
+.tab { color: #ABABAB; }
+.tab[aria-selected="true"] { color: #fff; }
+.tab[aria-selected="true"]::after { background: #fff; }
+
+/* Plan and Instructions pages */
+.doc .note { color: #C8C8C8; }
+.doc .disclaimer { color: #000; }
+.tbl th, .tbl td { border-color: #666; }
+.tbl thead th { color: #fff; }
+
+/* Keypad strip at the top */
+.hud { background: #000; border-bottom-color: #fff; box-shadow: 0 3px 10px rgba(255, 255, 255, 0.15); }
+.hud-total { color: #000; border-color: #fff; }
+.hud-reading { background: var(--bg, #121212); color: var(--fg, #fff); border-color: #fff; }
+
+/* Libre reading box */
+.libre-sheet { background: rgba(0, 0, 0, 0.75); }
+.libre-card { background: #121212; color: #fff; border-color: #fff; }
+.libre-value { border-color: #fff; }
+.libre-problem { color: #FF7A7A; }
+.libre-btns button { background: var(--field); color: #fff; border-color: #fff; }
+.libre-btns .primary { background: #00703C; border-color: #00703C; color: #fff; }
+.libre-btns button:focus-visible { outline-color: #4DA3FF; }
