@@ -74,7 +74,7 @@ const DOSE_PLAN = {
     low:     { key: 'low',     text: 'LOW: treat with 20 g rapid carbs first',    style: 'red',   flash: true },
     sweets:  { key: 'sweets',  text: 'Take sweets to avoid Hypoglycemia',         style: 'red',   flash: false },
     below80: { key: 'below80', text: 'Below 80: inject after eating',             style: 'red',   flash: false },
-    high:    { key: 'high',    text: 'Above 180: Please inject Insulins ASAP!!!', style: 'red',   flash: true },
+    high:    { key: 'high',    text: 'Above 180: Please Inject Insulin ASAP!!!', style: 'red',   flash: true },
     great:   { key: 'great',   text: 'You’re doing Great!!! 😊',                  style: 'green', flash: false }
   },
 

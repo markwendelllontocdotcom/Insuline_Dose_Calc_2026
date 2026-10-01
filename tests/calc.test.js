@@ -10,7 +10,7 @@ const { calculate, foodDose, correctionDose, findMeal, mealForTime, readingColou
 
 const MINUS = '−';
 const GREAT = 'You’re doing Great!!! 😊';
-const HIGH = 'Above 180: Please inject Insulins ASAP!!!';
+const HIGH = 'Above 180: Please Inject Insulin ASAP!!!';
 const LOW = 'LOW: treat with 20 g rapid carbs first';
 const SWEETS = 'Take sweets to avoid Hypoglycemia';
 const BELOW80 = 'Below 80: inject after eating';
